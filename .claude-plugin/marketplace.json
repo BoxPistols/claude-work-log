@@ -1,0 +1,15 @@
+{
+  "name": "claude-work-log",
+  "description": "Claude Codeが実行したコマンドと変更したファイルを、色分けした一覧としてパネルに出すmod",
+  "owner": {
+    "name": "BoxPistols",
+    "url": "https://github.com/BoxPistols"
+  },
+  "plugins": [
+    {
+      "name": "work-log",
+      "source": "./",
+      "description": "このセッションで変更したファイルと実行したコマンドを横のパネルに一覧で出す"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+
+# Claude Codeがmodを読み込むたびに書く型定義とtsconfig
+.claude-plugin/types/
+
+# このフォルダでClaude Codeを動かしたときの手元の状態
+.claude/
