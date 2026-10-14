@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 
 const pane = {
   title: '作業の記録',
@@ -83,23 +84,64 @@ test('並び順は新しい順から始まり、押すと古い順になる', as
   expect(await firstRow()).not.toBe(newest)
 })
 
-test('パネルは端末の幅の30%以下の列数と、一覧が出る高さで開く', async ($, on) => {
+// エンジンの代わりに、開いたことにして列数と行数だけ控える
+const recordOpen = (on: Parameters<TestBody>[1]) => {
   const opened: number[] = []
   const heights: number[] = []
-  // エンジンの代わりに、開いたことにして列数だけ控える
   on('ui.open', (_$, e) => {
     opened.push(e.columns ?? 0)
     heights.push(e.rows ?? 0)
     return { value: { isPlaced: true } }
   })
+  return { opened, heights }
+}
 
-  for (const columns of [200, 120]) {
+test('パネルは端末の幅の40%を36〜96列に収めた幅と、一覧が出る高さで開く', async ($, on) => {
+  const { opened, heights } = recordOpen(on)
+
+  for (const columns of [200, 120, 60, 300]) {
     await $.command.run({ command: 'work-log', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns } })
   }
-  // 枠の2列を足しても30%を超えない
-  expect(opened).toEqual([58, 34])
-  expect(opened.every((one, i) => one + 2 <= [200, 120][i]! * 0.3)).toBe(true)
-  expect(heights).toEqual([12, 12])
+  expect(opened).toEqual([80, 48, 36, 96])
+  expect(heights).toEqual([12, 12, 12, 12])
+})
+
+test('引数に列数を渡すとその幅で開き、範囲の外は端に寄せる', async ($, on) => {
+  const { opened } = recordOpen(on)
+
+  for (const args of ['100', ' 64 ', '5', '500', 'wide']) {
+    await $.command.run({ command: 'work-log', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+  }
+  // 数でない引数は指定が無いものとして扱う
+  expect(opened).toEqual([100, 64, 20, 200, 48])
+})
+
+test('横に置いたときは80列から、入力欄の上では60列から一覧を左右に並べる', async ($, on) => {
+  on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: '', interrupted: false } }))
+  await $.tool.call({ tool: 'Bash', command: 'ls /example', description: '例' })
+
+  const sideBySide = async (placement: 'dock' | 'inline', bodyColumns: number) => {
+    const ui = await $.ui.mount({ plugin: 'work-log', surface: 'terminal', component: 'Pane', requestId: 'work-log', props: { ...pane, placement, bodyColumns } })
+    // 左右に並べると、一覧の箱は幅の半分になる
+    const boxes = await ui.findAll({ type: 'Box' })
+    const half = Math.floor((bodyColumns - 2) / 2)
+    const found = boxes.some(one => one.props.width === half)
+    await ui.unmount()
+    return found
+  }
+
+  expect(await sideBySide('dock', 79)).toBe(false)
+  expect(await sideBySide('dock', 80)).toBe(true)
+  expect(await sideBySide('inline', 59)).toBe(false)
+  expect(await sideBySide('inline', 60)).toBe(true)
+})
+
+test('検索の行では並び順のボタンを検索欄より先に置く', async $ => {
+  const ui = await $.ui.mount({ plugin: 'work-log', surface: 'terminal', component: 'Pane', requestId: 'work-log', props: { ...pane, bodyColumns: 36 } })
+  const keys = (await ui.findAll({})).map(one => one.key)
+
+  expect(keys.indexOf('order')).toBeGreaterThan(-1)
+  expect(keys.indexOf('order')).toBeLessThan(keys.indexOf('query'))
 })
 
 test('種類ごとに行頭の記号が変わる', async ($, on) => {
@@ -155,7 +197,7 @@ test('名前つきの凡例が1行に収まらないときは記号と件数だ�
   for (const command of ['ls /example', 'touch /example/a', 'npm test', 'git status', 'echo example']) {
     await $.tool.call({ tool: 'Bash', command, description: '例' })
   }
-  const narrow = { ...pane, bodyColumns: 60 } as const
+  const narrow = { ...pane, bodyColumns: 30 } as const
   const ui = await $.ui.mount({ plugin: 'work-log', surface: 'terminal', component: 'Pane', requestId: 'work-log', props: narrow })
 
   expect((await ui.find({ key: 'k:read' }))?.text).toBe('● 1')

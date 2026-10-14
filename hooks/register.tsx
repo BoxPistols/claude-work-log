@@ -9,9 +9,16 @@ import { columnsOf, fit } from './width'
 
 const PANE = 'work-log'
 const TITLE = '作業の記録'
-// 横に置いたパネルが端末の幅に占める割合の上限と、狭すぎて読めなくなる下限
-const SHARE = 0.3
-const MIN_COLUMNS = 20
+// 横に置いたパネルが端末の幅に占める割合と、その列数の下限・上限
+const SHARE = 0.4
+const MIN_COLUMNS = 36
+const MAX_COLUMNS = 96
+// `/work-log 80`のように列数を指定されたときに受け付ける範囲
+const ARG_MIN = 20
+const ARG_MAX = 200
+// コマンドとファイルの一覧を左右に並べる幅。これ未満では上下に積む
+// 入力欄の上は高さが少なく、積むと一覧が半分になるので、横に置くときより狭い幅から左右に並べる
+const WIDE = { dock: 80, inline: 60 } as const
 // 入力欄の上に置くときの高さ。見出し2行の下に一覧が出る分を取る。右に置くときは使われない
 const ROWS = 12
 // 再読み込みしても記録が消えないよう$.stateに持つ
@@ -50,8 +57,11 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'work-log' }, async ($, e) => {
-    // 横に置くときは端末の幅の30%以下に収める。枠の2列ぶんを引く。幅が届かないときは80列とみなす
-    const columns = Math.max(MIN_COLUMNS, Math.floor((e.presentation?.columns ?? 80) * SHARE) - 2)
+    // 引数に列数があればそれを使う。無ければ端末の幅の40%を36〜96列に収める。幅が届かないときは80列とみなす
+    const asked = Number.parseInt(e.args.trim(), 10)
+    const columns = Number.isInteger(asked)
+      ? Math.min(ARG_MAX, Math.max(ARG_MIN, asked))
+      : Math.min(MAX_COLUMNS, Math.max(MIN_COLUMNS, Math.floor((e.presentation?.columns ?? 80) * SHARE)))
     const { isPlaced } = await $.ui.open({ id: PANE, title: TITLE, columns, rows: ROWS })
 
     return { text: isPlaced ? '作業の記録を開きました' : '作業の記録は画面の幅が空くと表示されます' }
@@ -164,7 +174,7 @@ export const register: Register = on => {
 
     // 端末全体ではなくパネル本体の行数と幅で割り付ける
     const rows = Math.max(1, e.props.scroll.bodyRows)
-    const isWide = columns >= 60
+    const isWide = columns >= WIDE[e.props.placement]
     const width = isWide ? Math.floor((columns - 2) / 2) : columns
     // 見出しは流れと凡例（狭いときは2行）、検索欄。低いときは検索欄を隠して一覧を残す
     const headRows = isWide ? 1 : 2
@@ -242,6 +252,10 @@ export const register: Register = on => {
           <Box width={width} flexDirection="row" columnGap={2}>{legend}</Box>
         </Box>
         {hasSearch && <Box flexDirection="row" columnGap={2}>
+          {/* 幅が足りないときに切れるのが検索欄の説明の側になるよう、並び順を先に置く */}
+          <Button plain key="order" onPress={() => update($, order, now => (now === 'new' ? 'old' : 'new'))}>
+            <Text dimColor>{sort === 'new' ? '新しい順' : '古い順'}</Text>
+          </Button>
           {Input && <Input
             key="query"
             label="検索 "
@@ -251,9 +265,6 @@ export const register: Register = on => {
             onInput={(value: string) => update($, query, () => value)}
             onSubmit={(value: string) => update($, query, () => value)}
           />}
-          <Button plain key="order" onPress={() => update($, order, now => (now === 'new' ? 'old' : 'new'))}>
-            <Text dimColor>{sort === 'new' ? '新しい順' : '古い順'}</Text>
-          </Button>
         </Box>}
         <Box flexDirection={isWide ? 'row' : 'column'} columnGap={2}>
           {commandBox}

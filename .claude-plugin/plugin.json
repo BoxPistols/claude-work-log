@@ -1,1 +1,1 @@
-{ "name": "work-log", "version": "0.1.0", "description": "このセッションで変更したファイルと実行したコマンドを横のパネルに一覧で出す", "author": { "name": "BoxPistols", "url": "https://github.com/BoxPistols" }, "repository": "https://github.com/BoxPistols/claude-work-log", "license": "MIT", "types": "./types/index.d.ts" }
+{ "name": "work-log", "version": "0.2.0", "description": "このセッションで変更したファイルと実行したコマンドを横のパネルに一覧で出す", "author": { "name": "BoxPistols", "url": "https://github.com/BoxPistols" }, "repository": "https://github.com/BoxPistols/claude-work-log", "license": "MIT", "types": "./types/index.d.ts" }
